@@ -12,9 +12,11 @@
 
 #include <X11/Xlib.h>
 
-char *tzargentina = "America/Buenos_Aires";
-char *tzutc = "UTC";
-char *tzberlin = "Europe/Berlin";
+#define BATT_NOW	"/sys/class/power_supply/BAT0/charge_now"
+#define BATT_FULL	"/sys/class/power_supply/BAT0/charge_full"
+#define BATT_STATUS	"/sys/class/power_supply/BAT0/status"
+
+char *tzlocal = "Europe/Prague";
 
 static Display *dpy;
 
@@ -92,34 +94,58 @@ loadavg(void)
 	return smprintf("%.2f %.2f %.2f", avgs[0], avgs[1], avgs[2]);
 }
 
+char *
+getbattery(){
+	long lnum1, lnum2 = 0;
+	char *status = malloc(sizeof(char)*12);
+	char s = '?';
+	FILE *fp = NULL;
+	if ((fp = fopen(BATT_NOW, "r"))) {
+		fscanf(fp, "%ld\n", &lnum1);
+		fclose(fp);
+		fp = fopen(BATT_FULL, "r");
+		fscanf(fp, "%ld\n", &lnum2);
+		fclose(fp);
+		fp = fopen(BATT_STATUS, "r");
+		fscanf(fp, "%s\n", status);
+		fclose(fp);
+		if (strcmp(status,"Charging") == 0)
+			s = '^';
+		if (strcmp(status,"Discharging") == 0)
+			s = 'v';
+		if (strcmp(status,"Full") == 0)
+			s = '=';
+		return smprintf("%c %ld%%", s,(lnum1/(lnum2/100)));
+	}
+	else return smprintf("");
+}
+
+
 int
 main(void)
 {
 	char *status;
 	char *avgs;
-	char *tmar;
-	char *tmutc;
-	char *tmbln;
+	char *tmlocal;
+	char *bat;
 
 	if (!(dpy = XOpenDisplay(NULL))) {
 		fprintf(stderr, "dwmstatus: cannot open display.\n");
 		return 1;
 	}
 
-	for (;;sleep(90)) {
+	for (;;sleep(1)) {
 		avgs = loadavg();
-		tmar = mktimes("%H:%M", tzargentina);
-		tmutc = mktimes("%H:%M", tzutc);
-		tmbln = mktimes("KW %W %a %d %b %H:%M %Z %Y", tzberlin);
+		tmlocal = mktimes("%a %d %b %H:%M:%S %Z %Y w%V", tzlocal);
+		bat = getbattery();
 
-		status = smprintf("L:%s A:%s U:%s %s",
-				avgs, tmar, tmutc, tmbln);
+		status = smprintf("L:%s | %s | %s",
+				avgs, tmlocal, bat);
 		setstatus(status);
 		free(avgs);
-		free(tmar);
-		free(tmutc);
-		free(tmbln);
+		free(tmlocal);
 		free(status);
+		free(bat);
 	}
 
 	XCloseDisplay(dpy);
