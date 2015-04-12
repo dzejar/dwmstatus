@@ -100,6 +100,7 @@ getbattery(){
 	char *status = malloc(sizeof(char)*12);
 	char s = '?';
 	FILE *fp = NULL;
+	float level;
 	if ((fp = fopen(BATT_NOW, "r"))) {
 		fscanf(fp, "%ld\n", &lnum1);
 		fclose(fp);
@@ -109,13 +110,15 @@ getbattery(){
 		fp = fopen(BATT_STATUS, "r");
 		fscanf(fp, "%s\n", status);
 		fclose(fp);
+		level = (lnum1/(lnum2/100.0));
+		if (level > 100.0) level = 100.0;
 		if (strcmp(status,"Charging") == 0)
 			s = '^';
 		if (strcmp(status,"Discharging") == 0)
 			s = 'v';
 		if (strcmp(status,"Full") == 0)
 			s = '=';
-		return smprintf("%c %ld%%", s,(lnum1/(lnum2/100)));
+		return smprintf("%c %0.1f%%", s, level);
 	}
 	else return smprintf("");
 }
